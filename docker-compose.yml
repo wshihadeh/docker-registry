@@ -1,0 +1,32 @@
+version: '3.7'
+
+networks:
+  registry:
+    external: false
+
+services:
+
+  registry:
+    container_name: "registry_web"
+    image: registry:2.6
+    ports:
+      - 5000:5000
+    environment:
+      REGISTRY_HTTP_ADDR: :5000
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/docker.me.intern.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/docker.me.intern.key
+      REGISTRY_STORAGE: filesystem
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    volumes:
+      - ./data:/var/lib/registry
+      - ./certs:/certs
+      - ./config/config.yml:/etc/docker/registry/config.yml
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        "max-size": "10m"
+        "max-file": "5"
+    networks:
+      - registry
