@@ -62,7 +62,7 @@ remove_image_tags() {
   for tag_path in $REPO_DIR/$repo/$image/_manifests/tags/*; do
     local tag=$(basename $tag_path)
 
-    # Do not clenup execluded tags
+    # Do not cleanup excluded tags
     if ! [[ $tag =~ $EXCLUDE_TAGS ]]; then
       # get timestamp from tag folder
       local timestamp=$(date -d @$(stat -c %Y $tag_path) +%Y%m%d%H%M%S)
