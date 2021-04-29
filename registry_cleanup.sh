@@ -7,6 +7,8 @@
 
 : ${REGISTRY_URL:=http://127.0.0.1:5000}
 : ${REGISTRY_DIR:=./data}
+: ${REGISTRY_USERNAME:=}
+: ${REGISTRY_PASSWORD:=}
 : ${MAX_AGE_SECONDS:=$((30 * 24 * 3600))} # 30 days
 : ${DOCKER_REGISTRY_NAME:=registry_web}
 : ${DOCKER_REGISTRY_CONFIG:=/etc/docker/registry/config.yml}
@@ -20,7 +22,7 @@ REPO_DIR=${REGISTRY_DIR}/docker/registry/v2/repositories
 
 
 _curl() {
-  curl -fsS ${CURL_INSECURE_ARG} "$@"
+  curl -fsS ${CURL_INSECURE_ARG} "$@" -K- <<< "--user ${REGISTRY_USERNAME}:${REGISTRY_PASSWORD}"
 }
 
 # parse yyyymmddHHMMSS string into unix timestamp
