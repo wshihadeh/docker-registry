@@ -25,5 +25,5 @@ EXCLUDE_TAGS="^(\*|master|develop|latest|stable|(v|[0-9]\.)[0-9]+(\.[0-9]+)*)$"
 - Execute cleanup
 
 ```
-  CURL_INSECURE=true DRY_RUN=true ./registry_cleanup.sh
+  CURL_INSECURE=true ./registry_cleanup.sh
 ```
