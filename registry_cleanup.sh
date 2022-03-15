@@ -13,8 +13,10 @@
 : ${DOCKER_REGISTRY_NAME:=registry_web}
 : ${DOCKER_REGISTRY_CONFIG:=/etc/docker/registry/config.yml}
 : ${DRY_RUN:=false}
+: ${LAST_VALID_TAGS_COUNT:=3}
 
-EXCLUDE_TAGS="^(\*|master|develop|latest|stable|(v|[0-9]\.)[0-9]+(\.[0-9]+)*)$"
+
+EXCLUDE_TAGS="^(\*|master|develop|latest|stable)$"
 REPO_DIR=${REGISTRY_DIR}/docker/registry/v2/repositories
 
 # In doubt fall back to dry mode
@@ -54,18 +56,51 @@ remove_old_tags() {
   done
 }
 
+remove_tag_path() {
+
+				local tag_path=$1
+        if $DRY_RUN; then
+          echo "To be Deleted >>  rm -rf ${tag_path}"
+        else
+          TAG_COUNT=$((TAG_COUNT+1))
+          rm -rf ${tag_path}
+          echo "Deleted: $tag"
+        fi
+ 
+}
+
 remove_image_tags() {
   local repo=$1
   local image=$2
+	local dir="$REPO_DIR/$repo/$image/tags/"
 
-  echo "- Cleanup image $repo/$image"
+  # check if dir exists
+  [ ! -d "$dir" ] && return 0
 
+	local all_tags=$(ls -r $dir)
+	local all_version_tags=($(echo $all_tags | sed 's/[^0-9. ]*//g'))
+	local last_valid_tags=(${all_version_tags[@]:0:$LAST_VALID_TAGS_COUNT})
   local tag_path
-  for tag_path in $REPO_DIR/$repo/$image/_manifests/tags/*; do
+
+  for tag_path in $REPO_DIR/$repo/$image/tags/*; do
     local tag=$(basename $tag_path)
 
     # Do not cleanup excluded tags
     if ! [[ $tag =~ $EXCLUDE_TAGS ]]; then
+
+			if [[ " ${last_valid_tags[*]} " =~ " ${tag} " ]]; then
+				# if the tag is valid keep it
+				continue;
+			fi
+		
+      local regex_numeric='[^0-9]+$'
+
+			# numeric tag will remove it
+			if ! [[ $tag =~ $regex_numeric ]] ; then
+				remove_tag_path $tag_path
+				continue;
+			fi 
+
       # get timestamp from tag folder
       local timestamp=$(date -d @$(stat -c %Y $tag_path) +%Y%m%d%H%M%S)
 
@@ -75,13 +110,7 @@ remove_image_tags() {
 
       # check if the tag is old enough to delete
       if ((now - timestamp > $MAX_AGE_SECONDS)); then
-        if $DRY_RUN; then
-          echo "To be Deleted >>  rm -rf ${tag_path}"
-        else
-          echo "Deleted: $tag"
-          TAG_COUNT=$((TAG_COUNT+1))
-          rm -rf ${tag_path}
-        fi
+				remove_tag_path $tag_path
       fi
     fi
   done
@@ -149,10 +178,12 @@ print_summary(){
 
     [ ${FAILED_COUNT} -gt 0 ] && echo "${FAILED_COUNT} manifests failed. Check for curl errors in the output above."
 
-    echo "Disk usage before and after:"
-    echo "${DF_BEFORE}"
-    echo
-    echo "${DF_AFTER}"
+		if (($TAG_COUNT > 0)); then
+      echo "Disk usage before and after:"
+      echo "${DF_BEFORE}"
+      echo
+      echo "${DF_AFTER}"
+		fi
   fi
 }
 
@@ -172,10 +203,11 @@ start_cleanup(){
   [ "$CURL_INSECURE" == "true" ] && CURL_INSECURE_ARG=--insecure
 
   #verify registry url
-  if ! _curl -m 3 ${REGISTRY_URL}/v2/ > /dev/null; then
-    echo "Could not contact registry at ${REGISTRY_URL} - quitting"
-    exit 1
-  fi
+  #  if ! _curl -m 3 ${REGISTRY_URL}/v2/ > /dev/null; then
+  #		echo "Could not contact registry at ${REGISTRY_URL} - quitting"
+  #    exit 1
+  #  fi
+  #
 
   DF_BEFORE=$(df -Ph)
 
